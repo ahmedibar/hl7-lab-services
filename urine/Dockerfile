@@ -1,5 +1,8 @@
+# This lab-base is used for local build and you need to run docker build -f base/Dockerfile.base -t lab-base . to 
+# FROM lab-base
+
 # uses the shared base image
-FROM lab-base
+FROM ghcr.io/ahmedibar/lab-base:latest
 
 # Copy app code
 COPY ./app /app
