@@ -1,0 +1,17 @@
+FROM python:3.11-slim
+
+# Avoid permission issues
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# Install git and other system dependencies
+RUN apt-get update && apt-get install -y git && apt-get clean
+
+# Only copy requirements.txt first
+COPY ./base/requirements.txt .
+
+# Install dependencies manually
+RUN pip install --no-cache-dir -r requirements.txt \
+ && pip install git+https://github.com/frappe/frappe-client.git

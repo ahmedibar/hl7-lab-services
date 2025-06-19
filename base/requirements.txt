@@ -1,0 +1,7 @@
+requests
+pickledb
+pyzk
+PyQt5
+hl7
+hl7apy
+aiorun

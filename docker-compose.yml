@@ -1,0 +1,38 @@
+version: '3.9'
+
+services:
+  hormone:
+    build:
+      context: ./hormone
+      dockerfile: Dockerfile
+    container_name: hormone_service
+    image: lab-hormone
+    restart: always
+    env_file: 
+      - ./hormone/hormone.env
+    ports:
+      - "5010:5010"
+    networks:
+      - erpnet
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # for Docker-to-host access on Linux
+
+  urine:
+    build:
+      context: ./urine
+      dockerfile: Dockerfile
+    container_name: urine_service
+    image: lab-urine
+    restart: always
+    env_file: 
+      - ./urine/urine.env
+    ports:
+      - "5030:5030"
+    networks:
+      - erpnet
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # for Docker-to-host access on Linux
+
+networks:
+  erpnet:
+    driver: bridge
