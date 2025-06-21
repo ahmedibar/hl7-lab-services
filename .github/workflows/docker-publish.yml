@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -24,17 +25,26 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push lab-base image
-        run: |
-          docker build -f base/Dockerfile.base -t ghcr.io/ahmedibar/lab-base:latest .
-          docker push ghcr.io/ahmedibar/lab-base:latest
+      - name: Build and push lab-base
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: base/Dockerfile.base
+          push: true
+          tags: ghcr.io/ahmedibar/lab-base:latest
 
-      - name: Build and push hormone image
-        run: |
-          docker build -t ghcr.io/ahmedibar/lab-hormone:latest ./hormone
-          docker push ghcr.io/ahmedibar/lab-hormone:latest
+      - name: Build and push hormone
+        uses: docker/build-push-action@v5
+        with:
+          context: ./hormone
+          file: ./hormone/Dockerfile
+          push: true
+          tags: ghcr.io/ahmedibar/lab-hormone:latest
 
-      - name: Build and push urine image
-        run: |
-          docker build -t ghcr.io/ahmedibar/lab-urine:latest ./urine
-          docker push ghcr.io/ahmedibar/lab-urine:latest
+      - name: Build and push urine
+        uses: docker/build-push-action@v5
+        with:
+          context: ./urine
+          file: ./urine/Dockerfile
+          push: true
+          tags: ghcr.io/ahmedibar/lab-urine:latest

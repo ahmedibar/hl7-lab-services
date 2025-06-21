@@ -10,7 +10,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y git && apt-get clean
 
 # Only copy requirements.txt first
-COPY ./base/requirements.txt .
+COPY base/requirements.txt .
 
 # Install dependencies manually
 RUN pip install --no-cache-dir -r requirements.txt \
