@@ -13,47 +13,54 @@ from send_to_erp import send_to_erp
 from local_config import HL7_HOST, HL7_PORT
 
 async def process_hl7_messages(hl7_reader, hl7_writer):
-    """This will be called every time a socket connects with us."""
     peername = hl7_writer.get_extra_info("peername")
     print(f"Connection established {peername}")
+
     try:
-        while not hl7_writer.is_closing():
-            try:
-                hl7_message = await hl7_reader.readmessage()
-                str_hl7_message = str(hl7_message)
+        try:
+            hl7_message = await hl7_reader.readmessage()
+        except asyncio.IncompleteReadError:
+            print("Client disconnected while reading message.")
+            return
+        except Exception as e:
+            print(f"❌ Error during message read: {e}")
+            return
 
-                # Split the message and parse
-                msg_lines = str_hl7_message.splitlines()
-                # print(msg_lines)
-                msg = hl7.parse(str_hl7_message)
+        if not hl7_message:
+            print("⚠️ Empty message received. Closing connection.")
+            return
 
-                lab_test_name = str_hl7_message.splitlines()[2].split('|')[2]
-                results = []
+        str_hl7_message = str(hl7_message)
+        msg_lines = str_hl7_message.splitlines()
 
-                for segment in msg:
-                    segment_name = segment[0]  # Get the segment name
-                    fields = segment[1:]  # Get the fields in the segment
-                    s_type = str(segment_name).lower().strip()
+        try:
+            lab_test_name = msg_lines[2].split('|')[2]
+        except IndexError:
+            print("⚠️ Could not extract lab_test_name. Message malformed?")
+            print(str_hl7_message)
+            return
 
-                    # Process OBX segment to extract lab results
-                    if s_type == "obx":
-                        result = str(fields).split("|")
-                        if result[1] in {"NM", "ST"}:
-                            results.append({"par": result[3], "value": result[4]})
+        msg = hl7.parse(str_hl7_message)
+        results = []
 
-                # Send results to ERP system
-                send_to_erp(lab_test_name, results)
-                # print("Barcode", lab_test_name)
-                # print(results)
+        for segment in msg:
+            segment_name = segment[0]
+            fields = segment[1:]
+            s_type = str(segment_name).lower().strip()
 
-            except Exception as e:
-                print(f"Error processing message: {e}")
+            if s_type == "obx":
+                result = str(fields).split("|")
+                if result[1] in {"NM", "ST"}:
+                    results.append({"par": result[3], "value": result[4]})
 
-        await hl7_writer.drain()
-    except asyncio.IncompleteReadError:
-        print("Incomplete read error, closing connection.")
+        send_to_erp(lab_test_name, results)
+        print("✅ Message processed successfully.")
+
     except Exception as e:
-        print(f"Connection error: {e}")
+        print(f"❌ Error processing message: {e}")
+        import traceback
+        traceback.print_exc()
+
     finally:
         if not hl7_writer.is_closing():
             hl7_writer.close()
@@ -65,9 +72,7 @@ async def main():
         print(f"Starting HL7 server on {HL7_HOST}:{HL7_PORT}...")
         async with await start_hl7_server(
             process_hl7_messages,
-            # '192.168.19.152',
             HL7_HOST,
-            # port=5010,
             port=HL7_PORT,
             limit=1024 * 128,
             encoding='utf-8',
@@ -77,7 +82,7 @@ async def main():
     except asyncio.CancelledError:
         pass
     except Exception as e:
-        print(f"Error occurred in main: {str(e)}")
+        print(f"❌ Error occurred in main: {str(e)}")
 
 def _safe_get_error_str(res):
     try:
@@ -105,7 +110,6 @@ def setup_logger(name, log_file, level=logging.INFO, formatter=None):
     return logger
 
 aiorun.run(main(), stop_on_unhandled_errors=True)
-
 
 
 
