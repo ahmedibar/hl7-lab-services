@@ -58,7 +58,7 @@ async def start_server_with_retries():
     while True:
         try:
             # print("Starting HL7 server...")
-            print(f"Starting HL7 server on {HL7_HOST}:{HL7_PORT}...")
+            print(f"Starting HL7 Urine server on {HL7_HOST}:{HL7_PORT}...")
             async with await start_hl7_server(
                 process_hl7_messages, 
                 # '192.168.19.152', 

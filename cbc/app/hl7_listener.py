@@ -1,88 +1,113 @@
-# Using the third party aiorun instead of the asyncio.run() to avoid boilerplate.
 import aiorun
 import asyncio
 import sys
 import requests
 from datetime import datetime
 import json
+import os
+import time
 import logging
 from logging.handlers import RotatingFileHandler
+
+from hl7 import parser
 import hl7
 from hl7.mllp import start_hl7_server
+from hl7apy.parser import parse_message
 from send_to_erp import send_to_erp
 from local_config import HL7_HOST, HL7_PORT
+
+
 
 async def process_hl7_messages(hl7_reader, hl7_writer):
     peername = hl7_writer.get_extra_info("peername")
     print(f"Connection established {peername}")
 
     try:
-        try:
-            hl7_message = await hl7_reader.readmessage()
-        except asyncio.IncompleteReadError:
-            print("Client disconnected while reading message.")
-            return
-        except Exception as e:
-            print(f"❌ Error during message read: {e}")
-            return
+        while not hl7_writer.is_closing():
+            try:
+                hl7_message = await hl7_reader.readmessage()
+                str_hl7_message = str(hl7_message)
+                msg_lines = str_hl7_message.splitlines()
 
-        if not hl7_message:
-            print("⚠️ Empty message received. Closing connection.")
-            return
+                results = []
+                hormone = 0
 
-        str_hl7_message = str(hl7_message)
-        msg_lines = str_hl7_message.splitlines()
+                if len(msg_lines) > 3:
+                    lab_test_name = msg_lines[2].split('|')[2]
 
-        try:
-            lab_test_name = msg_lines[2].split('|')[2]
-        except IndexError:
-            print("⚠️ Could not extract lab_test_name. Message malformed?")
-            print(str_hl7_message)
-            return
+                machine_model = msg_lines[0].split('|')[2]
+                machine_make = msg_lines[0].split('|')[3]
 
-        msg = hl7.parse(str_hl7_message)
-        results = []
+                if machine_model == "Maglumi User":
+                    for m in msg_lines:
+                        row = m.split('|')
+                        if row[0] == "SPM":
+                            lab_test_name = row[2].split('^')[0]
+                        if row[0] == "OBX":
+                            hormone = 1
+                            try:
+                                raw_value = row[5].split('^')[0].strip()
+                                value = round(float(raw_value), 2)
+                                results.append({"par": row[3], "value": value})
+                                print("inta", row[3])
+                            except Exception as e:
+                                print(f"Error parsing OBX value: {e}")
+                else:
+                    msg = hl7.parse(str_hl7_message)
+                    for segment in msg:
+                        s_type = str(segment[0]).lower().strip()
+                        fields = segment[1:]
 
-        for segment in msg:
-            segment_name = segment[0]
-            fields = segment[1:]
-            s_type = str(segment_name).lower().strip()
+                        if s_type == "obr":
+                            sample = str(fields).split("|")
 
-            if s_type == "obx":
-                result = str(fields).split("|")
-                if result[1] in {"NM", "ST"}:
-                    results.append({"par": result[3], "value": result[4]})
+                        if s_type == "obx":
+                            result = str(fields).split("|")
+                            if result[1] == "NM":
+                                # print(result)
+                                try:
+                                    normal = result[6]
+                                    pure_result = result[2].split('^')[0].strip()
+                                    raw_value = result[4].split('^')[0].strip()
+                                    value = round(float(raw_value), 2)
+                                    results.append({"par": pure_result, "value": value, "normal_range": normal})
+                                except Exception as e:
+                                    print(f"Error parsing OBX numeric: {e}")
 
-        send_to_erp(lab_test_name, results)
-        print("✅ Message processed successfully.")
+                send_to_erp(lab_test_name, results, hormone)
 
-    except Exception as e:
-        print(f"❌ Error processing message: {e}")
-        import traceback
-        traceback.print_exc()
+                await hl7_writer.drain()
+
+            except (ConnectionResetError, asyncio.IncompleteReadError) as e:
+                print(f"[{peername}] Connection lost: {e}")
+                break
+            except Exception as e:
+                print(f"[{peername}] Unexpected error: {e}")
 
     finally:
+        print(f"Connection closed {peername}")
         if not hl7_writer.is_closing():
             hl7_writer.close()
             await hl7_writer.wait_closed()
-        print(f"Connection closed {peername}")
+
 
 async def main():
     try:
-        print(f"Starting HL7 Hormone server on {HL7_HOST}:{HL7_PORT}...")
+        print(f"Starting HL7 CBC server on {HL7_HOST}:{HL7_PORT}...")
         async with await start_hl7_server(
-            process_hl7_messages,
+            process_hl7_messages, 
+            # '192.168.19.152', 
             HL7_HOST,
+            # port=5660, 
             port=HL7_PORT,
             limit=1024 * 128,
-            encoding='utf-8',
-            encoding_errors='replace'
         ) as hl7_server:
             await hl7_server.serve_forever()
     except asyncio.CancelledError:
         pass
     except Exception as e:
-        print(f"❌ Error occurred in main: {str(e)}")
+        print(f"Server error: {e}")
+
 
 def _safe_get_error_str(res):
     try:
@@ -95,10 +120,10 @@ def _safe_get_error_str(res):
         error_str = str(res.__dict__)
     return error_str
 
+
 def setup_logger(name, log_file, level=logging.INFO, formatter=None):
     if not formatter:
         formatter = logging.Formatter('%(asctime)s\t%(levelname)s\t%(message)s')
-
     handler = RotatingFileHandler(log_file, maxBytes=10000000, backupCount=50)
     handler.setFormatter(formatter)
 
@@ -109,7 +134,10 @@ def setup_logger(name, log_file, level=logging.INFO, formatter=None):
 
     return logger
 
-aiorun.run(main(), stop_on_unhandled_errors=True)
+
+if __name__ == "__main__":
+    aiorun.run(main(), stop_on_unhandled_errors=True)
+
 
 
 
@@ -158,7 +186,7 @@ aiorun.run(main(), stop_on_unhandled_errors=True)
 # # Run the server
 # async def main():
 #     host = "0.0.0.0"  # Accept from any interface
-#     port = 5010
+#     port = 5030
 #     print(f"Starting HL7 server on {host}:{port}...")
 #     async with await start_hl7_server(process_hl7_messages, host=host, port=port) as server:
 #         await server.serve_forever()

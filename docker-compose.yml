@@ -32,6 +32,36 @@ services:
       - erpnet
     extra_hosts:
       - "host.docker.internal:host-gateway"  # for Docker-to-host access on Linux
+  cbc:
+    build:
+      context: ./cbc
+      dockerfile: Dockerfile
+    container_name: cbc_service
+    image: lab-cbc
+    restart: always
+    # env_file: 
+    #   - ./cbc/cbc.env
+    ports:
+      - "5660:5660"
+    networks:
+      - erpnet
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # for Docker-to-host access on Linux
+  biochemistry:
+    build:
+      context: ./biochemistry
+      dockerfile: Dockerfile
+    container_name: biochemistry_service
+    image: lab-biochemistry
+    restart: always
+    # env_file: 
+    #   - ./biochemistry/biochemistry.env
+    ports:
+      - "5680:5680"
+    networks:
+      - erpnet
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # for Docker-to-host access on Linux
 
 networks:
   erpnet:
