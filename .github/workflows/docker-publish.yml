@@ -54,4 +54,3 @@ jobs:
             ghcr.io/ahmedibar/${{ matrix.service.name }}:latest
             ghcr.io/ahmedibar/${{ matrix.service.name }}:${{ github.sha }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
