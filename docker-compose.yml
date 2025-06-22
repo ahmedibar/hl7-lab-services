@@ -1,67 +1,53 @@
 version: '3.9'
 
 services:
-  hormone:
-    build:
-      context: ./hormone
-      dockerfile: Dockerfile
-    container_name: hormone_service
-    image: lab-hormone
-    restart: always
-    # env_file: 
-    #   - ./hormone/hormone.env
-    ports:
-      - "5010:5010"
-    networks:
-      - erpnet
-    extra_hosts:
-      - "host.docker.internal:host-gateway"  # for Docker-to-host access on Linux
-
-  urine:
-    build:
-      context: ./urine
-      dockerfile: Dockerfile
-    container_name: urine_service
-    image: lab-urine
-    restart: always
-    # env_file: 
-    #   - ./urine/urine.env
-    ports:
-      - "5030:5030"
-    networks:
-      - erpnet
-    extra_hosts:
-      - "host.docker.internal:host-gateway"  # for Docker-to-host access on Linux
-  cbc:
-    build:
-      context: ./cbc
-      dockerfile: Dockerfile
-    container_name: cbc_service
-    image: lab-cbc
-    restart: always
-    # env_file: 
-    #   - ./cbc/cbc.env
-    ports:
-      - "5660:5660"
-    networks:
-      - erpnet
-    extra_hosts:
-      - "host.docker.internal:host-gateway"  # for Docker-to-host access on Linux
   biochemistry:
-    build:
-      context: ./biochemistry
-      dockerfile: Dockerfile
+    image: ghcr.io/ahmedibar/lab-biochemistry:latest
     container_name: biochemistry_service
-    image: lab-biochemistry
     restart: always
-    # env_file: 
-    #   - ./biochemistry/biochemistry.env
+    env_file: ./biochemistry.env
     ports:
       - "5680:5680"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - erpnet
+
+  hormone:
+    image: ghcr.io/ahmedibar/lab-hormone:latest
+    container_name: hormone_service
+    restart: always
+    env_file: ./hormone.env
+    ports:
+      - "5010:5010"
     extra_hosts:
-      - "host.docker.internal:host-gateway"  # for Docker-to-host access on Linux
+      - "host.docker.internal:host-gateway"
+    networks:
+      - erpnet
+
+  urine:
+    image: ghcr.io/ahmedibar/lab-urine:latest
+    container_name: urine_service
+    restart: always
+    env_file: ./urine.env
+    ports:
+      - "5030:5030"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - erpnet
+
+  cbc:
+    image: ghcr.io/ahmedibar/lab-cbc:latest
+    container_name: cbc_service
+    restart: always
+    env_file: ./cbc.env
+    ports:
+      - "5660:5660"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - erpnet
 
 networks:
   erpnet:
